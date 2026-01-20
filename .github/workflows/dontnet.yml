@@ -19,6 +19,7 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
+      # ✅ Kör alltid på solutionen i root
       - name: Restore
         run: dotnet restore ./CI_CD_Group_8.sln
 
@@ -51,6 +52,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          # ✅ FIX: ingen punkt efter latest
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/swedish-personnummer-validator:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/swedish-personnummer-validator:${{ github.sha }}
