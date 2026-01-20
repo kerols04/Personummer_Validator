@@ -198,7 +198,7 @@ docker run -it swedish-personnummer-validator
 
 ---
 
-## 📦 DockerHub
+# DockerHub
 
 Docker-imagen publiceras automatiskt till DockerHub via GitHub Actions:
 
