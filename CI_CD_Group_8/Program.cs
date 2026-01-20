@@ -68,7 +68,7 @@ namespace CI_CD_Group_8
      */
     public static class PersonnummerValidator
     {
-        // ✅ FIX FÖR CI + TESTER:
+        // FIX FÖR CI + TESTER:
         // Dina xUnit-tester anropar PersonnummerValidator.IsValid(...)
         // Men den metoden fanns inte i din kod → CI failar vid build/test.
         // Denna wrapper löser det direkt.
@@ -229,3 +229,4 @@ namespace CI_CD_Group_8
             => new ValidationResult(false, "", default, "", message);
     }
 }
+
