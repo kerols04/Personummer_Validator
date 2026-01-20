@@ -2,9 +2,9 @@ name: .NET CI - Build, Test & Docker
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -13,31 +13,54 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
 
-      #  VIKTIGT: peka på rätt .sln
+      - name: Locate solution or project
+        shell: bash
+        run: |
+          echo "Searching for .sln..."
+          SLN="$(find . -maxdepth 6 -type f -name '*.sln' | head -n 1)"
+          if [ -n "$SLN" ]; then
+            echo "Found solution: $SLN"
+            echo "TARGET=$SLN" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          echo "No .sln found. Searching for a .csproj..."
+          CSPROJ="$(find . -maxdepth 6 -type f -name '*.csproj' | head -n 1)"
+          if [ -n "$CSPROJ" ]; then
+            echo "Found project: $CSPROJ"
+            echo "TARGET=$CSPROJ" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          echo "ERROR: No .sln or .csproj found."
+          echo "Repo tree (depth 3):"
+          find . -maxdepth 3 -print
+          exit 1
+
       - name: Restore
-        run: dotnet restore CI_CD_Group_8/CI_CD_Group_8.sln
+        run: dotnet restore "${{ env.TARGET }}"
 
       - name: Build
-        run: dotnet build CI_CD_Group_8/CI_CD_Group_8.sln -c Release --no-restore
+        run: dotnet build "${{ env.TARGET }}" -c Release --no-restore
 
       - name: Test
-        run: dotnet test CI_CD_Group_8/CI_CD_Group_8.sln -c Release --no-build --verbosity normal
+        run: dotnet test "${{ env.TARGET }}" -c Release --no-build --verbosity normal
 
   docker:
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -51,4 +74,3 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/swedish-personnummer-validator:latest
-
