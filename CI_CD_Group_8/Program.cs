@@ -184,5 +184,48 @@ namespace CI_CD_Group_8
             }
 
             int controlDigit = last10[9] - '0';
-            return (10 - (sum %
+            return (10 - (sum % 10)) % 10 == controlDigit;
+        }
 
+        private static string FormatNormalized(DateTime birthDate, string last10, char? separator)
+        {
+            char sep = separator ?? '-';
+            return $"{birthDate:yyyyMMdd}{sep}{last10.Substring(6, 4)}";
+        }
+
+        private static string GenderHintFromSerial(string last10)
+        {
+            int digit = last10[8] - '0';
+            return (digit % 2 == 0) ? "Kvinna" : "Man";
+        }
+    }
+
+    /*
+     * ===========================
+     * VALIDATIONRESULT
+     * ===========================
+     */
+    public sealed class ValidationResult
+    {
+        public bool IsValid { get; }
+        public string Normalized { get; }
+        public DateTime BirthDate { get; }
+        public string GenderHint { get; }
+        public string ErrorMessage { get; }
+
+        private ValidationResult(bool valid, string normalized, DateTime date, string gender, string error)
+        {
+            IsValid = valid;
+            Normalized = normalized;
+            BirthDate = date;
+            GenderHint = gender;
+            ErrorMessage = error;
+        }
+
+        public static ValidationResult Valid(string normalized, DateTime date, string gender)
+            => new ValidationResult(true, normalized, date, gender, "");
+
+        public static ValidationResult Invalid(string message)
+            => new ValidationResult(false, "", default, "", message);
+    }
+}
