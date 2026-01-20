@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-COPY CI_CD_Group_8/CI_CD_Group_8.sln .
+COPY CI_CD_Group_8.sln .
 COPY CI_CD_Group_8/CI_CD_Group_8/ CI_CD_Group_8/
 COPY CI_CD_Group_8/CI_CD_Group_8.Tests/ CI_CD_Group_8.Tests/
 
