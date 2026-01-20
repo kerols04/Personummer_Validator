@@ -1,0 +1,71 @@
+name: .NET CI - Build and Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      # Hitta solution automatiskt (slipper fel sökväg/case)
+      - name: Locate solution file
+        shell: bash
+        run: |
+          echo "Searching for .sln..."
+          SLN_PATH="$(find . -maxdepth 4 -type f -name '*.sln' | head -n 1)"
+          if [ -z "$SLN_PATH" ]; then
+            echo "ERROR: No .sln file found."
+            echo "Repo root files:"
+            ls -la
+            echo "Searching for csproj:"
+            find . -maxdepth 6 -type f -name '*.csproj' -print
+            exit 1
+          fi
+          echo "Found solution: $SLN_PATH"
+          echo "SLN_PATH=$SLN_PATH" >> "$GITHUB_ENV"
+
+      - name: Restore dependencies
+        run: dotnet restore "${{ env.SLN_PATH }}"
+
+      - name: Build
+        run: dotnet build "${{ env.SLN_PATH }}" --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test "${{ env.SLN_PATH }}" --no-build --configuration Release --verbosity normal
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    # Kör bara på push till main + bara om secrets finns (så PR inte kraschar)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/swedish-personnummer-validator:latest
