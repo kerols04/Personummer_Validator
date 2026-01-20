@@ -14,7 +14,7 @@
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
   </ItemGroup>
 
-  <!-- ✅ FIX: Rätt projektreferens (så testerna kan kompilera mot din validator) -->
+  <!-- FIX: Rätt projektreferens (så testerna kan kompilera mot din validator) -->
   <ItemGroup>
     <ProjectReference Include="..\CI_CD_Group_8\CI_CD_Group_8.csproj" />
   </ItemGroup>
