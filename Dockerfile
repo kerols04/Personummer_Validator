@@ -1,56 +1,20 @@
-# ================================
-# STEG 1: BUILD-STAGE
-# ================================
-# Använder .NET 9 SDK för att bygga applikationen
+# ---------- BUILD ----------
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
 
-# Sätter arbetskatalog i containern
-WORKDIR /app
+COPY CI_CD_Group_8/CI_CD_Group_8.sln .
+COPY CI_CD_Group_8/CI_CD_Group_8/ CI_CD_Group_8/
+COPY CI_CD_Group_8/CI_CD_Group_8.Tests/ CI_CD_Group_8.Tests/
 
-# --------------------------------
-# Kopiera solution-filen först
-# (för bättre cache-hantering)
-# --------------------------------
-COPY *.sln ./
+RUN dotnet restore CI_CD_Group_8.sln
 
-# --------------------------------
-# Kopiera projektfiler (csproj)
-# Dessa behövs för dotnet restore
-# --------------------------------
-COPY Ci_CD_Group_8/CI_CD_Group_8/*.csproj ./Ci_CD_Group_8/CI_CD_Group_8/
-COPY Ci_CD_Group_8/CI_CD_Group_8.tests/*.csproj ./Ci_CD_Group_8/CI_CD_Group_8.tests/
-
-# --------------------------------
-# Återställ NuGet-paket
-# --------------------------------
-RUN dotnet restore
-
-# --------------------------------
-# Kopiera resten av källkoden
-# --------------------------------
 COPY . .
+WORKDIR /src/CI_CD_Group_8/CI_CD_Group_8
+RUN dotnet publish -c Release -o /app/publish
 
-# --------------------------------
-# Bygg och publicera applikationen
-# Tester körs i CI – inte här
-# --------------------------------
-WORKDIR /app/Ci_CD_Group_8/CI_CD_Group_8
-RUN dotnet publish -c Release -o /app/publish --no-restore
-
-# ================================
-# STEG 2: RUNTIME-STAGE
-# ================================
-# Använder lättare runtime-image
-FROM mcr.microsoft.com/dotnet/runtime:9.0 AS runtime
-
-# Sätter arbetskatalog
+# ---------- RUNTIME ----------
+FROM mcr.microsoft.com/dotnet/runtime:9.0
 WORKDIR /app
-
-# Kopierar endast den färdigbyggda applikationen
 COPY --from=build /app/publish .
 
-# --------------------------------
-# Startkommando för containern
-# --------------------------------
 ENTRYPOINT ["dotnet", "CI_CD_Group_8.dll"]
-
