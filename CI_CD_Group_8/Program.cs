@@ -2,47 +2,65 @@ using System;
 using System.Globalization;
 using System.Linq;
 
-namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
+namespace CI_CD_Group_8
 {
-    /// <summary>
-    /// Entry point för konsolapplikationen.
-    /// Ansvarar endast för in-/utmatning (UI-logik).
-    /// Affärslogiken ligger i PersonnummerValidator.
-    /// </summary>
+    /*
+     * ===========================
+     * PROGRAM – GRUPP 8
+     * ===========================
+     * Detta är konsolapplikationens startpunkt.
+     *
+     * Viktigt designval:
+     * - Program-klassen hanterar ENDAST in- och utmatning (UI).
+     * - All faktisk logik för personnummerkontroll ligger i PersonnummerValidator.
+     *
+     * Detta följer principen:
+     * "Separation of Concerns" (ansvarsuppdelning)
+     */
     internal static class Program
     {
         static void Main()
         {
-            // Säkerställer att svenska tecken visas korrekt i konsolen
+            // Säkerställer att svenska tecken (å ä ö) visas korrekt i terminalen
             Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+            // Informationsutskrift till användaren
             Console.WriteLine("Personnummerkontroll – Grupp 8");
-            Console.WriteLine("Giltiga format:");
-            Console.WriteLine("YYMMDD-XXXX, YYMMDDXXXX, YYYYMMDD-XXXX, YYYYMMDDXXXX (+ tillåts)");
+            Console.WriteLine("Tillåtna format:");
+            Console.WriteLine("YYMMDD-XXXX, YYMMDDXXXX, YYYYMMDD-XXXX, YYYYMMDDXXXX");
+            Console.WriteLine("Även + som separator stöds.");
             Console.WriteLine();
 
-            // Kör tills användaren själv avslutar
+            /*
+             * Programmet körs i en loop tills användaren själv väljer att avsluta.
+             * Detta gör programmet användarvänligt och testbart.
+             */
             while (true)
             {
                 Console.Write("Ange personnummer (eller 'q' för att avsluta): ");
-                var input = Console.ReadLine()?.Trim();
+                string? input = Console.ReadLine()?.Trim();
 
-                // Avsluta programmet
+                // Om användaren skriver 'q' avslutas programmet direkt
                 if (string.Equals(input, "q", StringComparison.OrdinalIgnoreCase))
                     return;
 
-                // Tom inmatning = fel
+                // Tom inmatning är alltid fel
                 if (string.IsNullOrWhiteSpace(input))
                 {
                     Console.WriteLine("Fel: Tom inmatning.\n");
                     continue;
                 }
 
-                // Validera personnumret
-                var result = PersonnummerValidator.Validate(input);
+                /*
+                 * Validering sker via PersonnummerValidator.
+                 * Program-klassen bryr sig inte om HUR valideringen sker,
+                 * bara OM den är giltig eller inte.
+                 */
+                ValidationResult result = PersonnummerValidator.Validate(input);
 
                 if (result.IsValid)
                 {
+                    // All information kommer färdigpaketerad i ValidationResult
                     Console.WriteLine("✔ Personnumret är giltigt");
                     Console.WriteLine($"Normaliserat format: {result.Normalized}");
                     Console.WriteLine($"Födelsedatum: {result.BirthDate:yyyy-MM-dd}");
@@ -50,6 +68,7 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
                 }
                 else
                 {
+                    // Felmeddelandet kommer från valideringslogiken
                     Console.WriteLine("✖ Personnumret är ogiltigt");
                     Console.WriteLine(result.ErrorMessage);
                 }
@@ -59,14 +78,24 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
         }
     }
 
-    /// <summary>
-    /// Innehåller all affärslogik för validering av svenska personnummer.
-    /// </summary>
+    /*
+     * ===========================
+     * PERSONNUMMERVALIDATOR
+     * ===========================
+     * Denna klass innehåller ALL affärslogik.
+     * Den kan testas fristående via enhetstester (xUnit).
+     */
     public static class PersonnummerValidator
     {
+        /// <summary>
+        /// Huvudmetod för validering av svenska personnummer.
+        /// Returnerar ett ValidationResult istället för bool
+        /// för att kunna ge detaljerad feedback.
+        /// </summary>
         public static ValidationResult Validate(string input)
         {
-            var trimmed = input.Trim();
+            // Ta bort onödiga mellanslag
+            string trimmed = input.Trim();
 
             // Identifiera eventuell separator (+ eller -)
             char? separator =
@@ -74,55 +103,65 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
                 trimmed.Contains('-') ? '-' :
                 (char?)null;
 
-            // Ta bort allt utom siffror
-            var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+            /*
+             * Ta bort alla tecken som inte är siffror.
+             * Detta gör att vi kan hantera flera format på samma sätt.
+             */
+            string digits = new string(trimmed.Where(char.IsDigit).ToArray());
 
-            // Svenskt personnummer måste ha 10 eller 12 siffror
+            // Ett svenskt personnummer ska ha 10 eller 12 siffror
             if (digits.Length != 10 && digits.Length != 12)
             {
                 return ValidationResult.Invalid(
-                    "Fel format: Personnumret måste bestå av 10 eller 12 siffror.");
+                    "Fel format: Personnumret måste innehålla 10 eller 12 siffror.");
             }
 
-            // De sista 10 siffrorna används för Luhn-kontrollen
-            var last10 = digits.Length == 12
+            /*
+             * De sista 10 siffrorna används alltid i Luhn-kontrollen,
+             * oavsett om personnumret skrivs med 10 eller 12 siffror.
+             */
+            string last10 = digits.Length == 12
                 ? digits.Substring(2, 10)
                 : digits;
 
-            // Validera födelsedatum
             DateTime birthDate;
 
+            /*
+             * Datumvalidering:
+             * - 12 siffror → YYYYMMDD
+             * - 10 siffror → YYMMDD (kräver sekeltolkning)
+             */
             if (digits.Length == 12)
             {
-                // YYYYMMDD
                 if (!TryParseDateExact(digits.Substring(0, 8), "yyyyMMdd", out birthDate))
                 {
                     return ValidationResult.Invalid(
-                        "Ogiltigt datum: Datumdelen (YYYYMMDD) är inte giltig.");
+                        "Ogiltigt datum: YYYYMMDD är inte ett giltigt datum.");
                 }
             }
             else
             {
-                // YYMMDD – kräver sekeltolkning
-                if (!TryParseDateExact(digits.Substring(0, 6), "yyMMdd", out var parsed))
+                if (!TryParseDateExact(digits.Substring(0, 6), "yyMMdd", out DateTime parsed))
                 {
                     return ValidationResult.Invalid(
-                        "Ogiltigt datum: Datumdelen (YYMMDD) är inte giltig.");
+                        "Ogiltigt datum: YYMMDD är inte ett giltigt datum.");
                 }
 
+                // Avgör rätt sekel baserat på separator och dagens datum
                 birthDate = ResolveCentury(parsed, separator);
             }
 
-            // Kontrollsiffra (Luhn-algoritmen)
+            // Kontrollsiffra enligt Luhn-algoritmen
             if (!IsValidLuhnForPersonnummer(last10))
             {
                 return ValidationResult.Invalid(
-                    "Ogiltig kontrollsiffra: Luhn-kontrollen misslyckades.");
+                    "Ogiltig kontrollsiffra: Luhn-algoritmen misslyckades.");
             }
 
-            // Normalisera till standardformat
-            var normalized = FormatNormalized(birthDate, last10, separator);
+            // Skapa ett enhetligt, normaliserat format
+            string normalized = FormatNormalized(birthDate, last10, separator);
 
+            // Allt är korrekt → returnera giltigt resultat
             return ValidationResult.Valid(
                 normalized,
                 birthDate,
@@ -131,6 +170,7 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
 
         /// <summary>
         /// Försöker tolka ett datum exakt enligt angivet format.
+        /// Används för att undvika kulturberoende fel.
         /// </summary>
         private static bool TryParseDateExact(string value, string format, out DateTime date)
         {
@@ -143,14 +183,16 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
         }
 
         /// <summary>
-        /// Avgör rätt sekel baserat på separator och dagens datum.
+        /// Avgör rätt sekel (1800/1900/2000) för YYMMDD.
+        /// '+' betyder att personen är över 100 år.
+        /// '-' betyder under 100 år.
         /// </summary>
         private static DateTime ResolveCentury(DateTime yyDate, char? separator)
         {
-            var today = DateTime.Today;
+            DateTime today = DateTime.Today;
             int yy = yyDate.Year % 100;
 
-            var candidates = new[]
+            DateTime[] candidates =
             {
                 new DateTime(2000 + yy, yyDate.Month, yyDate.Day),
                 new DateTime(1900 + yy, yyDate.Month, yyDate.Day),
@@ -163,12 +205,12 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
             if (separator == '-')
                 return candidates.Where(d => d <= today).Max();
 
-            // Ingen separator → välj rimligast datum i dåtid
+            // Om ingen separator används: välj rimligaste datum i dåtid
             return candidates.Where(d => d <= today).Max();
         }
 
         /// <summary>
-        /// Luhn-algoritm anpassad för personnummer.
+        /// Luhn-algoritm (mod 10) anpassad för personnummer.
         /// </summary>
         private static bool IsValidLuhnForPersonnummer(string last10)
         {
@@ -179,15 +221,17 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
                 int digit = last10[i] - '0';
                 int factor = (i % 2 == 0) ? 2 : 1;
                 int product = digit * factor;
+
+                // Summera siffrorna i produkten
                 sum += (product > 9) ? product - 9 : product;
             }
 
-            int control = last10[9] - '0';
-            return (10 - (sum % 10)) % 10 == control;
+            int controlDigit = last10[9] - '0';
+            return (10 - (sum % 10)) % 10 == controlDigit;
         }
 
         /// <summary>
-        /// Skapar ett normaliserat personnummer i format YYYYMMDD-XXXX.
+        /// Skapar ett standardiserat format: YYYYMMDD-XXXX
         /// </summary>
         private static string FormatNormalized(DateTime birthDate, string last10, char? separator)
         {
@@ -196,7 +240,10 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
         }
 
         /// <summary>
-        /// Enkel könsindikering baserad på näst sista siffran.
+        /// Enkel könsindikering:
+        /// - Jämn siffra → Kvinna
+        /// - Udda siffra → Man
+        /// (Observera: detta är en förenkling)
         /// </summary>
         private static string GenderHintFromSerial(string last10)
         {
@@ -205,9 +252,13 @@ namespace CI_CD_Group_8 // Viktigt: samma namespace som resten av projektet
         }
     }
 
-    /// <summary>
-    /// Resultatobjekt för validering – används för tydlig felhantering.
-    /// </summary>
+    /*
+     * ===========================
+     * VALIDATIONRESULT
+     * ===========================
+     * Används för att returnera både status och detaljerad information.
+     * Detta är bättre än att returnera true/false.
+     */
     public sealed class ValidationResult
     {
         public bool IsValid { get; }
